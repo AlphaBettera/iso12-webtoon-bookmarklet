@@ -77,7 +77,7 @@
   <header>
     <h1>条漫逐屏翻页 · 书签一键复制</h1>
     <p class="lead">把老 iPad / iPhone 的 Safari 变成「点一下翻一屏」的条漫阅读器。</p>
-    <p class="env">实测 iPad mini 2 / iOS 12.5.8 · 需 Safari 本体 · 无需越狱</p>
+    <p class="env">V2.1 全屏可滑动版 · 17.5/65/17.5 分区 · iPad mini 2 / iOS 12.5.8 · 需 Safari 本体 · 无需越狱</p>
   </header>
 
   <div class="steps">
@@ -87,21 +87,21 @@
 
   <div class="card">
     <h2><span class="num">1</span> 宽度适配</h2>
-    <p class="desc">拆掉网站容器，让长图连成连续长流。保持原图比例，不强行放大。</p>
+    <p class="desc">逐层拆掉祖先容器写死的宽度，解决画面右移/留白；图片铺满视口。MutationObserver 让懒加载追加的图片自动适配。</p>
     <textarea id="code1" readonly></textarea>
     <button class="btn" data-target="code1">复制步骤1</button>
   </div>
 
   <div class="card">
     <h2><span class="num">2</span> 逐屏翻页（核心）</h2>
-    <p class="desc">点下侧 25% 前进，点上侧 25% 回看，中间 50% 照常滑动和点菜单。</p>
+    <p class="desc">轻点下侧 17.5% 前进、上侧 17.5% 回看；滑动（位移 &gt;15px）一律放行原生滚动，全屏下也能调整位置。每次翻页同时写 mgy 和 mgr。替换代码后请刷新页面重走步骤1 → 步骤2。</p>
     <textarea id="code2" readonly></textarea>
     <button class="btn" data-target="code2">复制步骤2</button>
   </div>
 
   <div class="card">
-    <h2><span class="num">3</span> 全屏 + 位置恢复（备用）</h2>
-    <p class="desc">画面最大，重进全屏能回到刚才的位置。必须最后点。</p>
+    <h2><span class="num">3</span> 全屏 + 位置比例同步（备用）</h2>
+    <p class="desc">画面最大；进、出全屏按 mgr 比例停在同一画面，滑动期间暂停拉回避免位置回弹。Safari 进全屏会清零滚动并重排布局，所以不用绝对像素。必须最后点。</p>
     <textarea id="code3" readonly></textarea>
     <button class="btn" data-target="code3">复制步骤3</button>
   </div>
@@ -115,21 +115,21 @@
 
   <div class="warn">
     <b>创建书签的方法</b>：Safari 打开任意网页 → 分享 →「添加书签」→ 直接保存 → 点书签图标 →「编辑」→ 点进 URL 字段全选删除 → 粘贴代码 →「完成」→ 再进编辑确认开头是 <code>javascript:</code>。<br><br>
-    <b>真全屏的坑</b>：步骤3 下点页脚菜单会卡死、中间无法滑动，这是 iOS 12 系统层 bug。日常推荐只用步骤1 + 步骤2。
+    <b>真全屏的坑</b>：步骤3 下点页脚菜单会卡死（iOS 12 系统层 bug）；滑动已在 V2.1 支持。日常推荐只用步骤1 + 步骤2。<br><br><b>夸克等第三方浏览器</b>：步骤1、2 或有戏，步骤3 的全屏 API 大概率无效（WKWebView 不暴露），能否执行 javascript: 书签需实测。
   </div>
 
   <footer>
-    AI 助理「阿财」(WorkBuddy) 协助调试 · MIT License
+    WorkBuddy AI 助手协助调试 · MIT License
   </footer>
 </div>
 
 <script>
 // 代码以字符串数组存放，避免 HTML 转义问题。
 var codes = {
-  code1: "javascript:document.head.insertAdjacentHTML('beforeend','<style>html,body{margin:0!important;padding:0!important;overflow-x:hidden!important;background:#000}img{width:auto!important;max-width:100%!important;height:auto!important;display:block!important;margin:0 auto!important}</style>')",
-  code2: "javascript:addEventListener('touchend',function(e){var t=e.changedTouches[0],o=document.elementFromPoint(t.clientX,t.clientY);if(o&&o.closest&&o.closest('a,button,[onclick]'))return;var c=t.clientY,H=innerHeight;if(c>=H*.25&&c<=H*.75)return;e.preventDefault();e.stopPropagation();var h=H-80,y=Math.max(0,scrollY-(c<H*.25?h:-h));scrollTo(0,y);try{sessionStorage.setItem('mgy',y)}catch(x){}},true)",
-  code3: "javascript:(function(){var e=document.documentElement,x=e.webkitRequestFullScreen||e.webkitRequestFullscreen||e.requestFullscreen;if(x)x.call(e);try{var y=sessionStorage.getItem('mgy');if(y)setTimeout(function(){scrollTo(0,parseInt(y))},400)}catch(z){}})()",
-  code4: "javascript:sessionStorage.removeItem('mgy')"
+  code1: "javascript:(function(){function fix(im){if(im.getAttribute('data-mmfix'))return;im.setAttribute('data-mmfix','1');var p=im;while(p&&p!==document.documentElement){p.style.maxWidth='none';p.style.width='100%';p.style.paddingLeft='0';p.style.paddingRight='0';p.style.marginLeft='0';p.style.marginRight='0';p=p.parentElement}im.style.width='100vw';im.style.maxWidth='none';im.style.height='auto';im.style.display='block';im.style.margin='0'}document.querySelectorAll('img').forEach(fix);new MutationObserver(function(){document.querySelectorAll('img:not([data-mmfix])').forEach(fix)}).observe(document.documentElement,{childList:true,subtree:true});var s=document.createElement('style');s.textContent='html,body{margin:0!important;padding:0!important;background:#000!important}';document.head.appendChild(s)})()",
+  code2: "javascript:(function(){var sY=0,sC=0,act=0;function R(){try{sessionStorage.setItem('mgr',scrollY/Math.max(1,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)-innerHeight))}catch(x){}}addEventListener('touchstart',function(e){act=1;sY=scrollY;sC=e.touches[0].clientY},true);addEventListener('touchend',function(e){var t=e.changedTouches[0],mv=act&&(Math.abs(t.clientY-sC)>15||Math.abs(scrollY-sY)>15);act=0;if(mv){window.sliding=1;setTimeout(function(){R();window.sliding=0},500);return}var o=document.elementFromPoint(t.clientX,t.clientY);if(o&&o.closest&&o.closest('a,button,[onclick]'))return;var c=t.clientY,H=innerHeight;if(c>=H*.175&&c<=H*.825)return;e.preventDefault();e.stopPropagation();var h=H-80,y=Math.max(0,scrollY-(c<H*.175?h:-h));scrollTo(0,y);try{sessionStorage.setItem('mgy',y);R()}catch(x){}},true)})()",
+  code3: "javascript:(function(){var e=document.documentElement,x=e.webkitRequestFullScreen||e.webkitRequestfullscreen,D=document.body,H=function(){return Math.max(1,Math.max(D.scrollHeight,e.scrollHeight)-innerHeight)},F=function(){try{sessionStorage.setItem('mgr',scrollY/H())}catch(z){}};function fix(){if(window.sliding)return;try{var y=sessionStorage.getItem('mgr');if(y)scrollTo(0,y*H())}catch(z){}}F();if(x)x.call(e);fix();var n=0,t=setInterval(function(){fix();if(++n>15)clearInterval(t)},100);if(!window.rz){window.rz=1;addEventListener('webkitfullscreenchange',fix);addEventListener('resize',fix)}})()",
+  code4: "javascript:sessionStorage.clear()"
 };
 
 Object.keys(codes).forEach(function (id) {
