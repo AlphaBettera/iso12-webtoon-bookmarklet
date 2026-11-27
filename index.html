@@ -77,7 +77,7 @@
   <header>
     <h1>条漫逐屏翻页 · 书签一键复制</h1>
     <p class="lead">把老 iPad / iPhone 的 Safari 变成「点一下翻一屏」的条漫阅读器。</p>
-    <p class="env">V2.3 退出定位修正版 · iPad mini 2 / iOS 12.5.8 · 需 Safari 本体 · 无需越狱</p>
+    <p class="env">V2.11（V2.10 + 修复进全屏漂移到旧画面，真机验证通过） · iPad mini 2 / iOS 12.5.8 · 需 Safari 本体 · 无需越狱</p>
   </header>
 
   <div class="steps">
@@ -94,14 +94,14 @@
 
   <div class="card">
     <h2><span class="num">2</span> 逐屏翻页（核心）</h2>
-    <p class="desc">轻点下侧 17.5% 前进、上侧 17.5% 回看；全屏下翻到长图末尾再点下侧会退出全屏、不再跳下一话。滑动（位移 &gt;15px）一律放行原生滚动。每次翻页同时写 mgy 和 mgr。替换代码后请刷新页面重走步骤1 → 步骤2。</p>
+    <p class="desc">上下 25% 轻点翻页，中间 50% 放行网站交互。真全屏下翻到所有图最后，轻点（未滑动 + &lt;500ms）自动退出全屏——退出判断在链接放行之前，不跳下一话；退出判断一个触点坐标都不用（scrollY 判末尾 + touchmove/相对位移判滑动），任意方向、任意幅度滑动都不退出。步骤2 用目标位置 y 写 mgy 与 mgr，翻页内核未动。替换代码后请刷新页面重走步骤1 → 步骤2 → 步骤3。</p>
     <textarea id="code2" readonly></textarea>
     <button class="btn" data-target="code2">复制步骤2</button>
   </div>
 
   <div class="card">
     <h2><span class="num">3</span> 全屏 + 进出位置同步（备用）</h2>
-    <p class="desc">画面最大；进、出全屏都走 15 次拉回停在同一画面，退出延迟 200ms 等布局稳定。Safari 会清零滚动并重排布局，所以不用绝对像素。必须最后点。</p>
+    <p class="desc">画面最大；进全屏走 15 次拉回停在同一画面，退出延迟 200ms+300ms 等布局稳定。<b>V2.11</b>：拉回加全屏态门卫，退出后非全屏翻到新画面再进全屏，停在新画面、不漂回旧画面。Safari 会清零滚动并重排布局，所以不用绝对像素。必须最后点。</p>
     <textarea id="code3" readonly></textarea>
     <button class="btn" data-target="code3">复制步骤3</button>
   </div>
@@ -115,7 +115,7 @@
 
   <div class="warn">
     <b>创建书签的方法</b>：Safari 打开任意网页 → 分享 →「添加书签」→ 直接保存 → 点书签图标 →「编辑」→ 点进 URL 字段全选删除 → 粘贴代码 →「完成」→ 再进编辑确认开头是 <code>javascript:</code>。<br><br>
-    <b>真全屏的坑</b>：步骤3 下点页脚菜单会卡死（iOS 12 系统层 bug）；滑动已在 V2.1 支持。日常推荐只用步骤1 + 步骤2。<br><br><b>夸克等第三方浏览器</b>：步骤1、2 或有戏，步骤3 的全屏 API 大概率无效（WKWebView 不暴露），能否执行 javascript: 书签需实测。
+    <b>真全屏的坑</b>：点页脚菜单会卡死（iOS 12 系统层 bug）；从屏幕边缘滑动会触发系统退出手势，JS 拦不住——从中间起滑减少误触，中途退出点左上角 ✕。<b>翻到所有图最后，轻点可自动退出全屏</b>（步骤2 V2.10，任意方向/幅度滑动不误退）。日常推荐只用步骤1 + 步骤2。<br><br><b>夸克等第三方浏览器</b>：步骤1、2 或有戏，步骤3 的全屏 API 大概率无效（WKWebView 不暴露），能否执行 javascript: 书签需实测。
   </div>
 
   <footer>
@@ -127,8 +127,8 @@
 // 代码以字符串数组存放，避免 HTML 转义问题。
 var codes = {
   code1: "javascript:(function(){function fix(im){if(im.getAttribute('data-mmfix'))return;im.setAttribute('data-mmfix','1');var p=im;while(p&&p!==document.documentElement){p.style.maxWidth='none';p.style.width='100%';p.style.paddingLeft='0';p.style.paddingRight='0';p.style.marginLeft='0';p.style.marginRight='0';p=p.parentElement}im.style.width='100vw';im.style.maxWidth='none';im.style.height='auto';im.style.display='block';im.style.margin='0'}document.querySelectorAll('img').forEach(fix);new MutationObserver(function(){document.querySelectorAll('img:not([data-mmfix])').forEach(fix)}).observe(document.documentElement,{childList:true,subtree:true});var s=document.createElement('style');s.textContent='html,body{margin:0!important;padding:0!important;background:#000!important}';document.head.appendChild(s)})()",
-  code2: "javascript:(function(){var sY=0,sC=0,act=0;function R(){try{sessionStorage.setItem('mgr',scrollY/Math.max(1,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)-innerHeight))}catch(x){}}addEventListener('touchstart',function(e){act=1;sY=scrollY;sC=e.touches[0].clientY},true);addEventListener('touchend',function(e){var t=e.changedTouches[0],mv=act&&(Math.abs(t.clientY-sC)>15||Math.abs(scrollY-sY)>15);act=0;if(mv){window.sliding=1;setTimeout(function(){R();window.sliding=0},500);return}var c=t.clientY,H=innerHeight,MX=Math.max(1,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)-H);if(c>H*.825&&(document.webkitFullscreenElement||document.fullscreenElement)&&scrollY>=MX-H*.2){e.preventDefault();e.stopPropagation();var E=document.webkitExitFullscreen||document.exitFullscreen;if(E)E.call(document);return}var o=document.elementFromPoint(t.clientX,t.clientY);if(o&&o.closest&&o.closest('a,button,[onclick]'))return;if(c>=H*.175&&c<=H*.825)return;e.preventDefault();e.stopPropagation();var h=H-80,y=Math.max(0,scrollY-(c<H*.175?h:-h));scrollTo(0,y);try{sessionStorage.setItem('mgy',y);R()}catch(x){}},true)})()",
-  code3: "javascript:(function(){var e=document.documentElement,x=e.webkitRequestFullScreen||e.webkitRequestfullscreen,D=document.body,H=function(){return Math.max(1,Math.max(D.scrollHeight,e.scrollHeight)-innerHeight)},S=sessionStorage,F=function(){try{S.setItem('mgr',scrollY/H())}catch(z){}},P=function(){var n=0,t=setInterval(function(){if(window.sliding)return;try{var y=S.getItem('mgr');if(y)scrollTo(0,y*H())}catch(z){}if(++n>15)clearInterval(t)},100)},O=function(){if(document.webkitFullscreenElement||document.fullscreenElement)return;setTimeout(P,200)};F();if(x)x.call(e);P();if(!window.rz){window.rz=1;addEventListener('webkitfullscreenchange',O);addEventListener('resize',O)}})()",
+  code2: "javascript:(function(){var ts=0,sC=0,moved=0;addEventListener('touchstart',function(e){ts=Date.now();sC=e.touches[0].clientY;moved=0},true);addEventListener('touchmove',function(){moved=1},true);addEventListener('touchend',function(e){var t=e.changedTouches[0],c=t.clientY,H=innerHeight,h=H-80,y=Math.max(0,scrollY-(c<H*.25?h:-h)),MX=Math.max(1,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)-H),sw=moved||Math.abs(t.clientY-sC)>8;if(!sw&&Date.now()-ts<500&&scrollY>=MX-2&&(document.webkitFullscreenElement||document.fullscreenElement)){e.preventDefault();e.stopPropagation();var E=document.webkitExitFullscreen||document.exitFullscreen;if(E)E.call(document);return}var o=document.elementFromPoint(t.clientX,t.clientY);if(o&&o.closest&&o.closest('a,button,[onclick]'))return;if(c>=H*.25&&c<=H*.75)return;e.preventDefault();e.stopPropagation();scrollTo(0,y);try{sessionStorage.setItem('mgy',y);sessionStorage.setItem('mgr',y/Math.max(1,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)-H))}catch(x){}},true)})()",
+  code3: "javascript:(function(){var e=document.documentElement,x=e.webkitRequestFullScreen||e.webkitRequestfullscreen,D=document.body,F=function(){return document.webkitFullscreenElement||document.fullscreenElement},H=function(){return Math.max(1,Math.max(D.scrollHeight,e.scrollHeight)-innerHeight)},P=function(){try{var y=sessionStorage.getItem('mgr');if(y)scrollTo(0,y*H())}catch(z){}},Q=function(){if(F())P()};try{sessionStorage.setItem('mgr',scrollY/H())}catch(z){}if(x)x.call(e);P();var n=0,t=setInterval(function(){Q();if(++n>15)clearInterval(t)},100);if(!window.rz){window.rz=1;addEventListener('webkitfullscreenchange',function(){if(F())P();else{setTimeout(P,200);setTimeout(P,300)}});addEventListener('resize',Q)}})()",
   code4: "javascript:sessionStorage.clear()"
 };
 
