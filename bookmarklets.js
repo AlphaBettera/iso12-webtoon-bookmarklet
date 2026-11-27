@@ -1,5 +1,5 @@
 /**
- * iOS 12 条漫逐屏翻页书签  —  V2.1（全屏可滑动版）
+ * iOS 12 条漫逐屏翻页书签  —  V2.3（退出全屏定位修正版）
  * ------------------------------------------------------------------
  * 把老 iPad / iPhone 的 Safari 变成「点一下翻一屏」的条漫阅读器。
  * 实测设备：iPad mini 2 / iOS 12.5.8
@@ -49,7 +49,7 @@ javascript:(function(){function fix(im){if(im.getAttribute('data-mmfix'))return;
 //                             期间置 window.sliding=1 让步骤3 暂停拉回
 //   轻点上侧 17.5%        -> 回看一屏
 //   轻点中间 65%          -> 放行：点链接、网站自身交互
-//   轻点下侧 17.5%        -> 前进一屏
+//   轻点下侧 17.5%        -> 前进一屏；全屏且距末尾<20%屏高时 -> 退出全屏
 //
 // 两个关键设计：
 // 1) 用 touchend + 捕获阶段(true) + stopPropagation：
@@ -58,7 +58,11 @@ javascript:(function(){function fix(im){if(im.getAttribute('data-mmfix'))return;
 // 2) V2.1 位移判定：全屏态 innerHeight 失真，纯坐标中间区会错位，
 //    滑动被误判成翻页拦截。改用位移判定后滑动一律放行，与坐标无关。
 //    act 标志确保 touchstart 未记录时（act=0）不会误判为滑动。
-// 3) 用 elementFromPoint(clientX, clientY) 而不是 e.target 检测菜单：
+// 3) V2.2 全屏到底退出：c>H*.825 且全屏且 scrollY>=MX-H*.2 时
+//    调 webkitExitFullscreen/exitFullscreen 退出全屏，preventDefault+return。
+//    必须放在 elementFromPoint 链接放行之前 —— 否则末尾「下一话」<a>
+//    会先被放行，点下侧直接跳到新话。
+// 4) 用 elementFromPoint(clientX, clientY) 而不是 e.target 检测菜单：
 //    真全屏下 e.target 会退化成全屏根元素，基于它的判断会失效，
 //    导致点底部「首页/上一话/下一话/目录」被误判成翻页（甚至卡死）。
 //    按触点坐标取实际元素，全屏下依然准确。
@@ -77,7 +81,7 @@ javascript:(function(){function fix(im){if(im.getAttribute('data-mmfix'))return;
 //    持续更新它，拉回的永远是「最后翻到的位置」，不会把翻页吃掉。
 //    这正是这套代码「全屏翻页不出错」的核心，改动时务必保留。
 // ===================================================================
-javascript:(function(){var sY=0,sC=0,act=0;function R(){try{sessionStorage.setItem('mgr',scrollY/Math.max(1,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)-innerHeight))}catch(x){}}addEventListener('touchstart',function(e){act=1;sY=scrollY;sC=e.touches[0].clientY},true);addEventListener('touchend',function(e){var t=e.changedTouches[0],mv=act&&(Math.abs(t.clientY-sC)>15||Math.abs(scrollY-sY)>15);act=0;if(mv){window.sliding=1;setTimeout(function(){R();window.sliding=0},500);return}var o=document.elementFromPoint(t.clientX,t.clientY);if(o&&o.closest&&o.closest('a,button,[onclick]'))return;var c=t.clientY,H=innerHeight;if(c>=H*.175&&c<=H*.825)return;e.preventDefault();e.stopPropagation();var h=H-80,y=Math.max(0,scrollY-(c<H*.175?h:-h));scrollTo(0,y);try{sessionStorage.setItem('mgy',y);R()}catch(x){}},true)})()
+javascript:(function(){var sY=0,sC=0,act=0;function R(){try{sessionStorage.setItem('mgr',scrollY/Math.max(1,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)-innerHeight))}catch(x){}}addEventListener('touchstart',function(e){act=1;sY=scrollY;sC=e.touches[0].clientY},true);addEventListener('touchend',function(e){var t=e.changedTouches[0],mv=act&&(Math.abs(t.clientY-sC)>15||Math.abs(scrollY-sY)>15);act=0;if(mv){window.sliding=1;setTimeout(function(){R();window.sliding=0},500);return}var c=t.clientY,H=innerHeight,MX=Math.max(1,Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)-H);if(c>H*.825&&(document.webkitFullscreenElement||document.fullscreenElement)&&scrollY>=MX-H*.2){e.preventDefault();e.stopPropagation();var E=document.webkitExitFullscreen||document.exitFullscreen;if(E)E.call(document);return}var o=document.elementFromPoint(t.clientX,t.clientY);if(o&&o.closest&&o.closest('a,button,[onclick]'))return;if(c>=H*.175&&c<=H*.825)return;e.preventDefault();e.stopPropagation();var h=H-80,y=Math.max(0,scrollY-(c<H*.175?h:-h));scrollTo(0,y);try{sessionStorage.setItem('mgy',y);R()}catch(x){}},true)})()
 
 
 // ===================================================================
@@ -98,10 +102,10 @@ javascript:(function(){var sY=0,sC=0,act=0;function R(){try{sessionStorage.setIt
 // 2) setInterval 15 次 ×100ms —— Safari 进全屏是异步重排，单次 scrollTo
 //    会被随后的布局覆盖，需在 1.5 秒内反复拉回；因为步骤2 每次翻页都
 //    更新 mgr，这里的 fix() 读到的始终是最新位置，不会吃掉翻页。
-// 4) V2.1 if(window.sliding)return：手动滑动期间暂停拉回。否则
+// 5) V2.1 if(window.sliding)return：手动滑动期间暂停拉回。否则
 //    setInterval / resize / fullscreenchange 会把滑到的位置覆盖回旧 mgr，
 //    表现就是「全屏中间滑不动」。
-// 5) window.rz 一次性标志 + fullscreenchange / resize 双监听：
+// 6) window.rz 一次性标志 + fullscreenchange / resize 双监听：
 //    退出全屏时两个事件都会触发，fix() 用最新 mgr × 新 H() 定位；
 //    重复触发只是幂等地滚到同一处，不会累积偏移。
 //
@@ -114,7 +118,7 @@ javascript:(function(){var sY=0,sC=0,act=0;function R(){try{sessionStorage.setIt
 //   - 真全屏下 innerHeight 失真，步骤2 的中间判断区错位、无法滑动
 // 用步骤3 时请只用上下 17.5% 翻页，换话或微调前先退出全屏。
 // ===================================================================
-javascript:(function(){var e=document.documentElement,x=e.webkitRequestFullScreen||e.webkitRequestfullscreen,D=document.body,H=function(){return Math.max(1,Math.max(D.scrollHeight,e.scrollHeight)-innerHeight)},F=function(){try{sessionStorage.setItem('mgr',scrollY/H())}catch(z){}};function fix(){if(window.sliding)return;try{var y=sessionStorage.getItem('mgr');if(y)scrollTo(0,y*H())}catch(z){}}F();if(x)x.call(e);fix();var n=0,t=setInterval(function(){fix();if(++n>15)clearInterval(t)},100);if(!window.rz){window.rz=1;addEventListener('webkitfullscreenchange',fix);addEventListener('resize',fix)}})()
+javascript:(function(){var e=document.documentElement,x=e.webkitRequestFullScreen||e.webkitRequestfullscreen,D=document.body,H=function(){return Math.max(1,Math.max(D.scrollHeight,e.scrollHeight)-innerHeight)},S=sessionStorage,F=function(){try{S.setItem('mgr',scrollY/H())}catch(z){}},P=function(){var n=0,t=setInterval(function(){if(window.sliding)return;try{var y=S.getItem('mgr');if(y)scrollTo(0,y*H())}catch(z){}if(++n>15)clearInterval(t)},100)},O=function(){if(document.webkitFullscreenElement||document.fullscreenElement)return;setTimeout(P,200)};F();if(x)x.call(e);P();if(!window.rz){window.rz=1;addEventListener('webkitfullscreenchange',O);addEventListener('resize',O)}})()
 
 
 // ===================================================================
